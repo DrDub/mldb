@@ -18,8 +18,7 @@ namespace Datacratic {
     value of the iterator in a different thread.
 */
 template<typename It, typename It2, typename Fn>
-void parallelReduce(It first, It2 last, Fn doWork, int parent = -1,
-                    std::string groupName = "", std::string jobName = "")
+void parallelReduce(It first, It2 last, Fn doWork)
 {
     auto n = last - first;
 
