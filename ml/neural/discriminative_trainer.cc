@@ -8,7 +8,7 @@
 */
 
 #include "discriminative_trainer.h"
-#include "mldb/jml/utils/worker_task.h"
+#include "mldb/base/parallel.h"
 #include "mldb/jml/utils/guard.h"
 #include <boost/progress.hpp>
 

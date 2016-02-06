@@ -1,16 +1,14 @@
-// This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
-
 /* thread_context.h                                                -*- C++ -*-
    Jeremy Barnes, 26 February 2009
    Copyright (c) 2009 Jeremy Barnes.  All rights reserved.
 
+   This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
 
    Context for a thread.  Allows us to keep track of execution resources, etc
    as we go.
 */
 
-#ifndef __boosting__thread_context_h__
-#define __boosting__thread_context_h__
+#pragma once
 
 #include "mldb/jml/utils/worker_task.h"
 #include <boost/random/mersenne_twister.hpp>
@@ -123,5 +121,3 @@ private:
 };
 
 } // namespace ML
-
-#endif /* __boosting__thread_context_h__ */

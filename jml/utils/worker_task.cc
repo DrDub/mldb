@@ -1,14 +1,11 @@
-// This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
-
 /* worker_task.cc
    Jeremy Barnes, 30 October 2005
    Copyright (c) 2005 Jeremy Barnes  All rights reserved.
-   $Source$
 
-   Task to perform work.
+   This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
 */
 
-#include "mldb/jml/utils/worker_task.h"
+#include "worker_task.h"
 #include "mldb/arch/exception.h"
 #include <chrono>
 #include <thread>

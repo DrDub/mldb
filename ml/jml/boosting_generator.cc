@@ -22,7 +22,7 @@
 #include "boosting_core_parallel.h"
 
 #include "binary_symmetric.h"
-#include "mldb/jml/utils/worker_task.h"
+#include "mldb/base/parallel.h"
 #include "mldb/jml/utils/guard.h"
 #include <boost/scoped_ptr.hpp>
 

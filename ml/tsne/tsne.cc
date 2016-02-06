@@ -23,6 +23,7 @@
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/variate_generator.hpp>
 #include "mldb/jml/utils/worker_task.h"
+#include "mldb/base/parallel.h"
 #include <boost/timer.hpp>
 #include "mldb/arch/timers.h"
 #include "mldb/arch/sse2.h"
@@ -1323,7 +1324,7 @@ sparseProbsFromCoords(const std::function<float (int, int)> & dist,
                 cerr << "done " << x << " in " << timer.elapsed() << "s" << endl;
         };
 
-    run_in_parallel_blocked(0, nx, calcExample);
+    Datacratic::parallelReduce(0, nx, calcExample);
 
     if (treeOut)
         treeOut->reset(tree.release());
@@ -2078,8 +2079,8 @@ tsneApproxFromSparse(const std::vector<TsneSparseProbs> & exampleNeighbours,
                 //}
             };
 
-        ML::run_in_parallel(0, totalThreads, doThread);
-        //ML::run_in_parallel_blocked(0, nx, calcExample);
+        Datacratic::parallelReduce(0, totalThreads, doThread);
+        //parallelReduce(0, nx, calcExample);
 #else
         // Each example proceeds more or less independently
         for (unsigned x = 0;  x < nx;  ++x) {

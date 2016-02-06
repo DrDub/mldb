@@ -17,7 +17,7 @@
 #include "mldb/jml/utils/lightweight_hash.h"
 #include "mldb/server/dataset_context.h"
 #include "mldb/server/per_thread_accumulator.h"
-#include "mldb/jml/utils/worker_task.h"
+#include "mldb/base/parallel.h"
 #include "mldb/types/any_impl.h"
 #include "mldb/http/http_exception.h"
 #include "mldb/rest/rest_request_router.h"
@@ -1131,7 +1131,7 @@ generateRowsWhere(const SqlBindingScope & scope,
 
                 if (rows.size() >= 1000) {
                     // Scan the whole lot with the when in parallel
-                    ML::run_in_parallel_blocked(0, rows.size(), onRow);
+                    parallelReduce(0, rows.size(), onRow);
                 } else {
                     // Serial, since probably it's not worth the overhead
                     // to run them in parallel.
@@ -1299,7 +1299,7 @@ queryBasic(const SqlBindingScope & scope,
                     };
                 
                 if (allowParallel)
-                    ML::run_in_parallel_blocked(0, rows.size(), doRow);
+                    parallelReduce(0, rows.size(), doRow);
                 else {
                     for (unsigned i = 0;  i < rows.size();  ++i)
                         doRow(i);
@@ -1330,7 +1330,7 @@ queryBasic(const SqlBindingScope & scope,
                     };
         
                 if (allowParallel)
-                    ML::run_in_parallel(0, accum.numThreads(), copyRow);
+                    parallelReduce(0, accum.numThreads(), copyRow);
                 else {
                     for (unsigned i = 0;  i < accum.numThreads();  ++i)
                         copyRow(i);

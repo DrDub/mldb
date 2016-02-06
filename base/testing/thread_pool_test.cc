@@ -12,7 +12,7 @@
 
 #include "mldb/base/thread_pool.h"
 #include "mldb/arch/timers.h"
-#include "mldb/jml/utils/worker_task.h"
+#include "mldb/base/parallel.h"
 
 #include <boost/test/unit_test.hpp>
 #include <atomic>

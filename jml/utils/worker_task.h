@@ -115,13 +115,6 @@ public:
         run_until_finished(group);
     }
 
-private:
-    /** Add a job that belongs to the given group.  Jobs which are scheduled into
-        the same group will be scheduled together.  If there is an exception or
-        an error, the error job will be called.
-    */
-    Id add(const Job & job, const Job & error,
-           const std::string & info, Id group = -1);
 public:
 
     /** Add a job that belongs to the given group.  Jobs which are scheduled into
@@ -175,6 +168,13 @@ public:
     int runWorkerThread();
 
 private:
+    /** Add a job that belongs to the given group.  Jobs which are scheduled into
+        the same group will be scheduled together.  If there is an exception or
+        an error, the error job will be called.
+    */
+    Id add(const Job & job, const Job & error,
+           const std::string & info, Id group = -1);
+
     int threads_;
 
     std::vector<std::unique_ptr<std::thread> > workerThreads_;
@@ -288,52 +288,5 @@ private:
     /* Dump everything to cerr; for debugging */
     void dump() const;
 };
-
-/** Run a set of jobs in multiple threads.  The iterator will be iterated
-    through the range and the doWork function will be called with each
-    value of the iterator in a different thread.
-*/
-template<typename It, typename It2, typename Fn>
-void run_in_parallel(It first, It2 last, Fn doWork, int parent = -1,
-                     std::string groupName = "", std::string jobName = "",
-                     Worker_Task & worker
-                         = Worker_Task::instance(num_threads() - 1))
-{
-    worker.do_group(first, last, doWork, parent, groupName, jobName);
-}
-
-template<typename RAIt, typename RAIt2, typename Fn>
-void run_in_parallel_blocked(RAIt first, RAIt2 last,
-                             Fn doWork,
-                             int parent = -1,
-                             std::string groupName = "",
-                             std::string jobName = "",
-                             Worker_Task & worker
-                                 = Worker_Task::instance(num_threads() - 1))
-{
-    int numJobs = last - first;
-    if (numJobs < 16 * num_threads()) {
-        // less than 16 jobs per thread... do it directly
-        worker.do_group(first, last, doWork, parent, groupName, jobName);
-    }
-    else {
-        // Split into sub-groups such that we have roughly 16 jobs per
-        // thread
-        int numPerGroup = numJobs / num_threads() / 16;
-        int numGroups
-            = (numJobs / numPerGroup)
-            + (numJobs % numPerGroup != 0); // extra if there is a remainder
-
-        auto doGroup = [&] (int groupNum)
-            {
-                RAIt it = first + groupNum * numPerGroup;
-                for (int i = 0;  i < numPerGroup && it != last;  ++i, ++it)
-                    doWork(it);
-            };
-        
-        worker.do_group<int>(0, numGroups, doGroup, parent, groupName, jobName);
-    }
-}
-
 
 } // namespace ML

@@ -246,7 +246,10 @@ struct ThreadPool::Itl {
     {
         jobs.submitted += 1;
 
-        if (getEntry().queue->push(job)) {
+        std::unique_ptr<ThreadJob> overflow
+            (getEntry().queue->push(new ThreadJob(std::move(job))));
+
+        if (!overflow) {
             // There is a possible race condition here: if we add this
             // job just before the first thread goes to sleep,
             // then it will miss the wakeup.  We deal with this by having
@@ -260,7 +263,7 @@ struct ThreadPool::Itl {
             // The queue was full.  Do the work here, hopefully someone
             // will steal some work in the meantime.
             ++jobsWithFullQueue;
-            runJob(job);
+            runJob(*overflow);
         }
     }
 
@@ -272,11 +275,11 @@ struct ThreadPool::Itl {
         bool result = false;
 
         // First, do all of our work
-        ThreadJob job;
-        while (entry.queue->pop(job)) {
+        ThreadJob * job;
+        while ((job = entry.queue->pop())) {
             result = true;
             ++jobsRunLocally;
-            runJob(job);
+            runJob(*job);
         }
         
         return result;
@@ -319,10 +322,11 @@ struct ThreadPool::Itl {
             if (q == entry.queue)
                 continue;  // our own thread
 
-            ThreadJob job;
-            while (q->steal(job)) {
+            ThreadJob * job;
+            while ((job = q->steal())) {
                 ++jobsStolen;
-                runJob(job);
+                runJob(*job);
+                delete job;
                 runMine(entry);
             }
         }
@@ -348,6 +352,15 @@ struct ThreadPool::Itl {
             if (!runMine(entry))
                 stealWork(entry);
         }
+    }
+
+    /** Perform some work, if possible. */
+    void work()
+    {
+        ThreadEntry & entry = getEntry();
+
+        if (!runMine(entry))
+            stealWork(entry);
     }
 
     /** Run a worker thread. */
@@ -476,6 +489,13 @@ waitForAll() const
     itl->waitForAll();
 }
 
+void
+ThreadPool::
+work() const
+{
+    itl->work();
+}
+
 uint64_t
 ThreadPool::
 jobsRunning() const
@@ -516,6 +536,14 @@ ThreadPool::
 jobsRunLocally() const
 {
     return itl->jobsRunLocally;
+}
+
+ThreadPool &
+ThreadPool::
+instance()
+{
+    static ThreadPool result;
+    return result;
 }
 
 } // namespace Datacratic

@@ -15,7 +15,7 @@
 #include "mldb/vfs/fs_utils.h"
 #include "mldb/base/scope.h"
 #include "mldb/jml/stats/distribution.h"
-#include "mldb/jml/utils/worker_task.h"
+#include "mldb/base/parallel.h"
 #include <boost/algorithm/string.hpp>
 #include "mldb/http/http_exception.h"
 
@@ -536,7 +536,7 @@ struct GitImporter: public Procedure {
                 }
             };
 
-        ML::run_in_parallel(0, oids.size(), doProcessCommit);
+        parallelReduce(0, oids.size(), doProcessCommit);
 
         for (auto & t: accum.threads) {
             output->recordRows(t->rows);

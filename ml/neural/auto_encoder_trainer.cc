@@ -12,7 +12,7 @@
 #include "mldb/arch/threads.h"
 
 #include <boost/progress.hpp>
-#include "mldb/jml/utils/worker_task.h"
+#include "mldb/base/parallel.h"
 
 #include "mldb/jml/utils/guard.h"
 #include "mldb/jml/utils/configuration.h"

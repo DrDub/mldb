@@ -12,7 +12,7 @@
 #define __boosting__stump_training_parallel_h__
 
 
-#include "mldb/jml/utils/worker_task.h"
+#include "mldb/base/parallel.h"
 #include "mldb/jml/utils/guard.h"
 
 namespace ML {

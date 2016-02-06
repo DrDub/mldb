@@ -37,6 +37,8 @@ struct ThreadPool {
 
     void waitForAll() const;
 
+    void work() const;
+
     uint64_t jobsRunning() const;
     uint64_t jobsSubmitted() const;
     uint64_t jobsFinished() const;
@@ -45,6 +47,8 @@ struct ThreadPool {
     uint64_t jobsWithFullQueue() const;
     uint64_t jobsRunLocally() const;
 
+    static ThreadPool & instance();
+    
 private:
     struct Itl;
     std::unique_ptr<Itl> itl;
