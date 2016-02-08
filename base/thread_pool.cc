@@ -157,6 +157,17 @@ struct ThreadPool::Itl {
     /// Mutex to protect modification to the queue state
     std::mutex queuesMutex;
 
+    /// If we're in a hierarchy, this is our parent and we don't have
+    /// any queues ourselves.
+    ThreadPool::Itl * parent;
+
+    /// The number of jobs currently enqueued or running on the
+    /// parent.
+    std::atomic<size_t> parentJobs;
+
+    /// The maximum number of parallel jobs in the parent
+    size_t maxParentJobs;
+
     /** Return the number of jobs running.  If there are more than
         2^31 jobs running, this may give the wrong answer.
     */
@@ -193,7 +204,10 @@ struct ThreadPool::Itl {
           shutdown(0),
           threadsSleeping(0),
           threadCreationEpoch(0),
-          queues(new Queues(threadCreationEpoch))
+          queues(new Queues(threadCreationEpoch)),
+          parent(nullptr),
+          parentJobs(0),
+          maxParentJobs(0)
     {
         jobs.submitted = 0;
         jobs.finished = 0;
@@ -202,6 +216,23 @@ struct ThreadPool::Itl {
             workers.emplace_back([this, i] () { this->runWorker(i); });
         }
 
+        getEntry();
+    }
+
+    Itl(Itl & parent, size_t maxParentJobs)
+        : jobsStolen(0),
+          jobsWithFullQueue(0),
+          jobsRunLocally(0),
+          shutdown(0),
+          threadsSleeping(0),
+          threadCreationEpoch(0),
+          queues(new Queues(threadCreationEpoch)),
+          parent(&parent),
+          parentJobs(0),
+          maxParentJobs(maxParentJobs)
+    {
+        jobs.submitted = 0;
+        jobs.finished = 0;
         getEntry();
     }
 
@@ -250,13 +281,34 @@ struct ThreadPool::Itl {
             (getEntry().queue->push(new ThreadJob(std::move(job))));
 
         if (!overflow) {
-            // There is a possible race condition here: if we add this
-            // job just before the first thread goes to sleep,
-            // then it will miss the wakeup.  We deal with this by having
-            // the threads never sleep for too long, so that if we do
-            // miss a wakeup it won't be the end of the world.
-            if (threadsSleeping) {
-                wakeupCv.notify_one();
+            if (parent) {
+                // If there aren't enough jobs alredy, we submit a new
+                // one.
+                size_t numWereActive = parentJobs.fetch_add(1);
+                if (numWereActive >= maxParentJobs) {
+                    --parentJobs;
+                }
+                else {
+                    auto parentJob = [this] ()
+                        {
+                            while (this->work() || jobsRunning()) ;
+                            --this->parentJobs;
+                            // If there is a race, make sure work
+                            // gets done
+                            while (this->work());
+                        };
+                    parent->add(parentJob);
+                }
+            }
+            else {
+                // There is a possible race condition here: if we add this
+                // job just before the first thread goes to sleep,
+                // then it will miss the wakeup.  We deal with this by having
+                // the threads never sleep for too long, so that if we do
+                // miss a wakeup it won't be the end of the world.
+                if (threadsSleeping) {
+                    wakeupCv.notify_one();
+                }
             }
         }
         else {
@@ -354,13 +406,17 @@ struct ThreadPool::Itl {
         }
     }
 
-    /** Perform some work, if possible. */
-    void work()
+    /** Perform some work, if possible.  Returns true if work was done,
+        or false if none was available.
+    */
+    bool work()
     {
         ThreadEntry & entry = getEntry();
 
-        if (!runMine(entry))
-            stealWork(entry);
+        bool result;
+        if (!(result = runMine(entry)))
+            result = stealWork(entry);
+        return result;
     }
 
     /** Run a worker thread. */
@@ -470,6 +526,12 @@ ThreadPool(int numThreads)
 }
 
 ThreadPool::
+ThreadPool(ThreadPool & parent, int numThreads)
+    : itl(new Itl(*parent.itl, numThreads))
+{
+}
+
+ThreadPool::
 ~ThreadPool()
 {
     itl.reset();
@@ -542,7 +604,7 @@ ThreadPool &
 ThreadPool::
 instance()
 {
-    static ThreadPool result;
+    static ThreadPool result(numCpus());
     return result;
 }
 

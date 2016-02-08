@@ -35,4 +35,9 @@ void parallelReduce(It first, It2 last, Fn doWork)
     
 }
 
+template<typename It, typename It2, typename Fn>
+void parallelReduceChunked(It first, It2 last, size_t chunkSize, Fn doWork)
+{
+}
+
 } // namespace Datacratic

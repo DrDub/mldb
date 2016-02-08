@@ -25,6 +25,11 @@ using namespace std;
 
 
 namespace Datacratic {
+
+// Defined in thread_pool.h, and different from hardware_concurrency() as
+// it can be overridden.
+int numCpus();
+
 namespace MLDB {
 
 const int MIN_ROW_PER_TASK = 32;
@@ -802,7 +807,7 @@ struct RowHashOrderedExecutor: public BoundSelectQuery::Executor {
         int numNeeded = offset + limit;
 
         int upperBound = whereGenerator.upperBound;
-        int maxNumTask = std::thread::hardware_concurrency() * TASK_PER_THREAD;
+        int maxNumTask = numCpus() * TASK_PER_THREAD;
         //try to have at least MIN_ROW_PER_TASK element per task
         int numChunk = upperBound < maxNumTask*MIN_ROW_PER_TASK ? (upperBound / maxNumTask) : maxNumTask;
         numChunk = std::max(numChunk, (int)1U);
@@ -1344,7 +1349,7 @@ BoundGroupByQuery(const SelectExpression & select,
     boundRowName = rowName.bind(*groupContext);
 
     size_t maxNumRow = from.getMatrixView()->getRowCount();
-    int maxNumTask = std::thread::hardware_concurrency() * TASK_PER_THREAD;
+    int maxNumTask = numCpus() * TASK_PER_THREAD;
     //try to have at least MIN_ROW_PER_TASK rows per task
     numBuckets = maxNumRow <= maxNumTask*MIN_ROW_PER_TASK? maxNumRow / maxNumTask : maxNumTask;
     numBuckets = std::max(numBuckets, (size_t)1U);

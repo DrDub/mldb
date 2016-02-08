@@ -26,6 +26,7 @@ using namespace std;
 
 namespace ML {
 
+int num_threads();
 
 /*****************************************************************************/
 /* AUTO_ENCODER_TRAINER                                                      */
@@ -233,8 +234,6 @@ train_iter(Auto_Encoder & encoder,
            Thread_Context & thread_context,
            double learning_rate) const
 {
-    Worker_Task & worker = thread_context.worker();
-
     int nx = data.size();
     int ni JML_UNUSED = encoder.inputs();
     int no JML_UNUSED = encoder.outputs();
@@ -267,46 +266,25 @@ train_iter(Auto_Encoder & encoder,
                 
         Parameters_Copy<double> updates(encoder.parameters(), 0.0);
                 
-        // Now, submit it as jobs to the worker task to be done
-        // multithreaded
-        int group;
-        {
-            int parent = -1;  // no parent group
-            group = worker.get_group(NO_JOB, "dump user results task",
-                                     parent);
-                    
-            // Make sure the group gets unlocked once we've populated
-            // everything
-            Call_Guard guard(std::bind(&Worker_Task::unlock_group,
-                                         std::ref(worker),
-                                         group));
-                    
-                    
-            for (unsigned x2 = x;  x2 < nx2 && x2 < x + minibatch_size;
-                 x2 += microbatch_size) {
-                        
-                Train_Examples_Job job(*this,
-                                       encoder,
-                                       data,
-                                       x2,
-                                       min<int>(nx2,
-                                                min(x + minibatch_size,
-                                                    x2 + microbatch_size)),
-                                       examples,
-                                       thread_context,
-                                       thread_context.random(),
-                                       updates,
-                                       update_lock,
-                                       total_mse_exact,
-                                       total_mse_noisy,
-                                       progress.get());
+        auto doMicroBatch = [&] (size_t x0, size_t x1)
+            {
+                Train_Examples_Job(*this,
+                                   encoder,
+                                   data,
+                                   x0, x1,
+                                   examples,
+                                   thread_context,
+                                   thread_context.random(),
+                                   updates,
+                                   update_lock,
+                                   total_mse_exact,
+                                   total_mse_noisy,
+                                   progress.get())();
+            };
 
-                // Send it to a thread to be processed
-                worker.add(job, "blend job", group);
-            }
-        }
-                
-        worker.run_until_finished(group);
+        Datacratic::parallelReduceChunked
+            (x, std::min<size_t>(nx2, x + minibatch_size),
+             microbatch_size, doMicroBatch);
 
         // If we have weight decay, include that in the parameter updates
         // * l1 weight decay: we move each parameter towards zero by the
@@ -319,7 +297,7 @@ train_iter(Auto_Encoder & encoder,
         
         encoder.parameters().update(updates, -learning_rate);
     }
-
+    
     return make_pair(sqrt(total_mse_exact / nx2), sqrt(total_mse_noisy / nx2));
 }
 
@@ -330,8 +308,6 @@ train_iter(Auto_Encoder & encoder,
            Thread_Context & thread_context,
            const Parameters_Copy<float> & learning_rates) const
 {
-    Worker_Task & worker = thread_context.worker();
-
     int nx = data.size();
     int ni JML_UNUSED = encoder.inputs();
     int no JML_UNUSED = encoder.outputs();
@@ -364,51 +340,30 @@ train_iter(Auto_Encoder & encoder,
                 
         Parameters_Copy<double> updates(encoder.parameters(), 0.0);
                 
-        // Now, submit it as jobs to the worker task to be done
-        // multithreaded
-        int group;
-        {
-            int parent = -1;  // no parent group
-            group = worker.get_group(NO_JOB, "dump user results task",
-                                     parent);
-                    
-            // Make sure the group gets unlocked once we've populated
-            // everything
-            Call_Guard guard(std::bind(&Worker_Task::unlock_group,
-                                         std::ref(worker),
-                                         group));
-                    
-                    
-            for (unsigned x2 = x;  x2 < nx2 && x2 < x + minibatch_size;
-                 x2 += microbatch_size) {
-                        
-                Train_Examples_Job job(*this,
-                                       encoder,
-                                       data,
-                                       x2,
-                                       min<int>(nx2,
-                                                min(x + minibatch_size,
-                                                    x2 + microbatch_size)),
-                                       examples,
-                                       thread_context,
-                                       thread_context.random(),
-                                       updates,
-                                       update_lock,
-                                       total_mse_exact,
-                                       total_mse_noisy,
-                                       progress.get());
+        auto doMicroBatch = [&] (size_t x0, size_t x1)
+            {
+                Train_Examples_Job(*this,
+                                   encoder,
+                                   data,
+                                   x0, x1,
+                                   examples,
+                                   thread_context,
+                                   thread_context.random(),
+                                   updates,
+                                   update_lock,
+                                   total_mse_exact,
+                                   total_mse_noisy,
+                                   progress.get())();
+            };
 
-                // Send it to a thread to be processed
-                worker.add(job, "blend job", group);
-            }
-        }
-                
-        worker.run_until_finished(group);
-
+        Datacratic::parallelReduceChunked
+            (x, std::min<size_t>(nx2, x + minibatch_size),
+             microbatch_size, doMicroBatch);
+        
         //cerr << "applying minibatch updates" << endl;
         
         updates.values *= -1.0 / minibatch_size;
-
+        
         encoder.parameters().update(updates, learning_rates);
     }
 
@@ -1012,41 +967,21 @@ test_and_update(const Auto_Encoder & encoder,
     std::auto_ptr<boost::progress_display> progress;
     if (verbosity >= 3) progress.reset(new boost::progress_display(nx, cerr));
 
-    Worker_Task & worker = thread_context.worker();
-            
-    // Now, submit it as jobs to the worker task to be done
-    // multithreaded
-    int group;
-    {
-        int parent = -1;  // no parent group
-        group = worker.get_group(NO_JOB, "dump user results task",
-                                 parent);
-        
-        // Make sure the group gets unlocked once we've populated
-        // everything
-        Call_Guard guard(std::bind(&Worker_Task::unlock_group,
-                                     std::ref(worker),
-                                     group));
-        
-        // 20 jobs per CPU
-        int batch_size = nx / (num_threads() * 20);
-        
-        for (unsigned x = 0; x < nx;  x += batch_size) {
-            
-            Test_Examples_Job job(*this, encoder, data_in, data_out,
-                                  x, min<int>(x + batch_size, nx),
-                                  thread_context,
-                                  thread_context.random(),
-                                  update_lock,
-                                  error_exact, error_noisy,
-                                  progress.get());
-            
-            // Send it to a thread to be processed
-            worker.add(job, "blend job", group);
-        }
-    }
+    // 20 jobs per CPU
+    int batch_size = nx / (num_threads() * 20);
 
-    worker.run_until_finished(group);
+    auto doBatch = [&] (size_t x0, size_t x1)
+        {
+            Test_Examples_Job(*this, encoder, data_in, data_out,
+                              x0, x1,
+                              thread_context,
+                              thread_context.random(),
+                              update_lock,
+                              error_exact, error_noisy,
+                              progress.get())();
+        };
+
+    Datacratic::parallelReduceChunked(0, nx, batch_size, doBatch);
 
     return make_pair(sqrt(error_exact / nx),
                      sqrt(error_noisy / nx));

@@ -30,7 +30,8 @@ int numCpus();
 */
 
 struct ThreadPool {
-    ThreadPool(int numThreads = numCpus() - 1);
+    ThreadPool(ThreadPool & parent = instance(), int numThreads = numCpus());
+    ThreadPool(int numThreads);
     ~ThreadPool();
 
     void add(ThreadJob job);

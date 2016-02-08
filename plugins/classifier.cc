@@ -689,8 +689,8 @@ ClassifyFunction(MldbServer * owner,
 
 ClassifyFunction::
 ClassifyFunction(MldbServer * owner,
-              std::shared_ptr<ML::Classifier_Impl> classifier,
-              const std::string & labelFeatureName)
+                 std::shared_ptr<ML::Classifier_Impl> classifier,
+                 const std::string & labelFeatureName)
     : Function(owner)
 {
     itl.reset(new Itl());

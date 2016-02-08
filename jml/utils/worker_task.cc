@@ -15,7 +15,14 @@
 #include "mldb/jml/utils/environment.h"
 #include "mldb/jml/utils/guard.h"
 #include "mldb/arch/cpu_info.h"
-
+#include "mldb/arch/format.h"
+#include "mldb/arch/spinlock.h"
+#include "mldb/arch/semaphore.h"
+#include <list>
+#include <map>
+#include <mutex>
+#include <thread>
+#include "mldb/base/thread_pool.h"
 
 using namespace std;
 
@@ -43,7 +50,195 @@ void log(const string & msg)
     }
 }
 
+#if 0
 const Job NO_JOB;
+
+/*****************************************************************************/
+/* WORKER TASK IMPLEMENTATION                                                */
+/*****************************************************************************/
+
+struct Worker_Task::Itl {
+    ThreadPool tp;
+};
+
+
+/*****************************************************************************/
+/* WORKER TASK                                                               */
+/*****************************************************************************/
+
+Worker_Task &
+Worker_Task::
+instance(int thr)
+{
+}
+
+Worker_Task::
+Worker_Task(int threads)
+{
+}
+
+Worker_Task::
+~Worker_Task()
+{
+}
+
+Id
+Worker_Task::
+get_group(const Job & group_finish,
+          const std::string & info,
+          Id parent_group,
+          bool lock)
+{
+    return Id();
+}
+
+void
+Worker_Task::
+unlock_group(int group)
+{
+}
+
+Id
+Worker_Task::
+add(const Job & job, const std::string & info, Id group = -1)
+{
+    return Id();
+}
+
+void
+Worker_Task::
+run_until_finished(int group, bool unlock = false)
+{
+}
+
+#endif
+
+#if 0
+/*****************************************************************************/
+/* WORKER TASK IMPLEMENTATION                                                */
+/*****************************************************************************/
+
+struct Worker_Task::Itl {
+    /** Add a job that belongs to the given group.  Jobs which are scheduled into
+        the same group will be scheduled together.  If there is an exception or
+        an error, the error job will be called.
+    */
+    Id add(const Job & job, const Job & error,
+           const std::string & info, Id group = -1);
+
+    int threads_;
+
+    std::vector<std::unique_ptr<std::thread> > workerThreads_;
+    
+    struct Job_Info;
+
+    typedef std::list<Job_Info> Jobs;
+    
+    struct Job_Info {
+        Job_Info() : id(-1), group(-1) {}
+        Job_Info(const Job & job, const Job & error,
+                 const std::string & info, Id id, Id group = -1)
+            : job(job), error(error), id(id), group(group),
+              invalidGroup(false), info(info) {}
+        Job job;
+        Job error;
+        Id id;    // if -1, this is a group end marker
+        Id group;
+        bool invalidGroup; // true is group has error set
+        std::string info;
+        void dump(std::ostream & stream, int indent = 0) const;
+    };
+
+    struct Group_Info {
+        Group_Info()
+            : jobs_outstanding(0), jobs_running(0),
+              groups_outstanding(0), parent_group(0),
+              locked(false)
+        {
+        }
+
+        Job finished;
+        int jobs_outstanding;      ///< Number of jobs waiting for
+        int jobs_running;          ///< Number of jobs that are running
+        int groups_outstanding;    ///< Number of groups waiting for
+        Id parent_group;           ///< Group to notify when finished
+        Jobs::iterator group_job;  ///< Job for the group; always last
+        bool locked;
+        std::exception_ptr exc;    ///< Exception to rethrow
+        std::string info;
+
+        void dump(std::ostream & stream, int indent = 0) const;
+    };
+
+    /** Get a job. */
+    Job_Info get_job(int group = -1);
+
+    /** Tries to get a job, but doesn't fail if there isn't one. */
+    bool try_get_job(Job_Info & info, int group = -1);
+
+    /** Implementation of the get_job methods.  Requires that the jobs_sem
+        be acquired. */
+    Job_Info get_job_impl(int group);
+    
+    /** Unlocked implementation of the get_job methods.  Requires that the
+        jobs_sem be acquired and that the lock already be held. */
+    Job_Info get_job_impl_ul(int group);
+    
+    void finish_job(const Job_Info & info);
+
+    void remove_job_ul(const Jobs::iterator & it);
+
+    void add_state_semaphore(Semaphore & sem);
+
+    void remove_state_semaphore(Semaphore & sem);
+
+    void notify_state_changed();
+
+    // Check_finished, bit without the lock held
+    bool check_finished_ul(Id group);
+
+    /** Is the given job in the group?  Searches up the parent hierarchy. */
+    bool in_group(const Job_Info & info, int group);
+
+    /** Removes all queued jobs in the group.  Running jobs are left alone. */
+    void cancel_group(Group_Info & group_info, int group);
+
+    /** Removes all queued jobs in the group.  Running jobs are left alone. 
+        Lock must already be held. */
+    void cancel_group_ul(Group_Info & group_info, int group);
+
+    /** Marks invalid all the jobs belonging to a group, so that the worker threads can
+     * skip those jobs easily and in a lockless manner */
+    void mark_group_jobs_invalid_ul(Group_Info & group_info, int group);
+
+    /** Waits for running jobs to finish. */
+    void wait_group_finished(Group_Info & group_info, int group);
+
+    typedef std::mutex Lock;
+    //typedef Spinlock Lock;
+    typedef std::unique_lock<Lock> Guard;
+
+    Semaphore jobs_sem, finished_sem, state_change_sem, shutdown_sem;
+
+    /** Jobs we are running. */
+    Jobs jobs;
+    Id next_group;
+    Id next_job;
+    int num_queued;
+    int num_running;
+    Lock lock;
+
+    /** Groups that are currently running. */
+    std::map<Id, Group_Info> groups;
+
+    /** Semaphores that get released on each state change. */
+    std::set<Semaphore *> state_semaphores;
+
+    volatile bool force_finished;
+
+    /* Dump everything to cerr; for debugging */
+    void dump() const;
+}
 
 
 /*****************************************************************************/
@@ -979,5 +1174,6 @@ dump() const
     }
     stream << endl;
 }
+#endif
 
 } // namespace ML

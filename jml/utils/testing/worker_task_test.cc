@@ -28,6 +28,9 @@
 #include "mldb/arch/exception_handler.h"
 #include "mldb/arch/atomic_ops.h"
 #include "mldb/arch/demangle.h"
+#include "mldb/arch/format.h"
+#include "mldb/arch/spinlock.h"
+#include "mldb/arch/semaphore.h"
 
 using namespace ML;
 using namespace std;
