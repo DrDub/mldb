@@ -5,3 +5,5 @@ EXT_SUBDIRS ?= tinyxml2 googleurl cityhash lz4 lzma sqlite judy svm libstemmer s
 $(eval $(call include_sub_makes,$(EXT_SUBDIRS)))
 
 $(eval $(call include_sub_make,hoedown,hoedown,../hoedown.mk))
+$(eval $(call include_sub_make,libparserutils,libparserutils,../parserutils.mk))
+$(eval $(call include_sub_make,libhubbub,libhubbub,../hubbub.mk))
