@@ -202,7 +202,7 @@ struct SparseMatrixDataset::Itl
         std::unique_lock<RootLock> guard(rootLock);
         ++epoch;
 
-        ThreadPool tp;
+        ThreadPool tp(3);
 
         auto doCommit = [&] (MatrixWriteTransaction & trans)
             {
@@ -233,7 +233,7 @@ struct SparseMatrixDataset::Itl
         std::unique_lock<RootLock> guard(rootLock);
         // We don't increment the epoch since logically it's exactly the same
 
-        ThreadPool tp;
+        ThreadPool tp(3);
 
         tp.add(std::bind(&BaseMatrix::optimize,
                          matrix.get()));

@@ -26,7 +26,6 @@ using namespace std;
 
 namespace ML {
 
-int num_threads();
 
 /*****************************************************************************/
 /* AUTO_ENCODER_TRAINER                                                      */
@@ -238,7 +237,7 @@ train_iter(Auto_Encoder & encoder,
     int ni JML_UNUSED = encoder.inputs();
     int no JML_UNUSED = encoder.outputs();
 
-    int microbatch_size = minibatch_size / (num_threads() * 4);
+    int microbatch_size = minibatch_size / (Datacratic::numCpus() * 4);
             
     Lock update_lock;
 
@@ -312,7 +311,7 @@ train_iter(Auto_Encoder & encoder,
     int ni JML_UNUSED = encoder.inputs();
     int no JML_UNUSED = encoder.outputs();
 
-    int microbatch_size = minibatch_size / (num_threads() * 4);
+    int microbatch_size = minibatch_size / (Datacratic::numCpus() * 4);
             
     Lock update_lock;
 
@@ -968,7 +967,7 @@ test_and_update(const Auto_Encoder & encoder,
     if (verbosity >= 3) progress.reset(new boost::progress_display(nx, cerr));
 
     // 20 jobs per CPU
-    int batch_size = nx / (num_threads() * 20);
+    int batch_size = nx / (Datacratic::numCpus() * 20);
 
     auto doBatch = [&] (size_t x0, size_t x1)
         {

@@ -21,8 +21,6 @@ using namespace std;
 
 namespace ML {
 
-int num_threads();
-
 /*****************************************************************************/
 /* DISCRIMINATIVE_TRAINER                                                    */
 /*****************************************************************************/
@@ -244,7 +242,7 @@ train_iter(const std::vector<const float *> & data,
 {
     int nx = data.size();
 
-    int microbatch_size = std::max(minibatch_size / (num_threads() * 4), 1);
+    int microbatch_size = std::max(minibatch_size / (Datacratic::numCpus() * 4), 1);
             
     Lock update_lock;
 
@@ -531,7 +529,7 @@ test(const std::vector<const float *> & data,
     
     
     // 20 jobs per CPU
-    int batch_size = nx / (num_threads() * 20);
+    int batch_size = nx / (Datacratic::numCpus() * 20);
         
     auto onBatch = [&] (size_t x0, size_t x1)
         {

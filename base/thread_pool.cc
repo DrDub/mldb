@@ -117,15 +117,8 @@ struct ThreadPool::Itl {
     /// Job statistics.  This is designed to allow for a single atomic
     /// access to the full 64 bits to allow determiniation if all
     /// jobs have been terminated at a given point in time.
-    struct Jobs {
-        std::atomic<int> submitted;
-        std::atomic<int> finished;
-    };
-
-    union {
-        Jobs jobs;
-        std::atomic<uint64_t> startedFinished;
-    };
+    std::atomic<uint32_t> submitted;
+    std::atomic<uint32_t> finished;
 
     /// Statistics counters for debugging and information
     std::atomic<uint64_t> jobsStolen, jobsWithFullQueue, jobsRunLocally;
@@ -173,28 +166,22 @@ struct ThreadPool::Itl {
     */
     unsigned jobsRunning() const
     {
-        uint64_t val = startedFinished;
+        uint32_t s = submitted.load();
+        uint32_t f = finished.load();
 
-        union {
-            Jobs jobs;
-            uint64_t startedFinished;
-        };
-
-        startedFinished = val;
-        
-        return jobs.submitted - jobs.finished;
+        return s - f;
     }
 
     /** Return the number of jobs submitted.  Wraps around at INT_MAX. */
     int jobsSubmitted() const
     {
-        return jobs.submitted;
+        return submitted;
     }
 
     /** Return the number of jobs finished.  Wraps around at INT_MAX. */
     int jobsFinished() const
     {
-        return jobs.finished;
+        return finished;
     }
 
     Itl(int numThreads)
@@ -209,8 +196,8 @@ struct ThreadPool::Itl {
           parentJobs(0),
           maxParentJobs(0)
     {
-        jobs.submitted = 0;
-        jobs.finished = 0;
+        submitted = 0;
+        finished = 0;
 
         for (unsigned i = 0;  i < numThreads;  ++i) {
             workers.emplace_back([this, i] () { this->runWorker(i); });
@@ -231,8 +218,8 @@ struct ThreadPool::Itl {
           parentJobs(0),
           maxParentJobs(maxParentJobs)
     {
-        jobs.submitted = 0;
-        jobs.finished = 0;
+        submitted = 0;
+        finished = 0;
         getEntry();
     }
 
@@ -243,7 +230,16 @@ struct ThreadPool::Itl {
             this->shutdown = 1;
         }
         wakeupCv.notify_all();
+
+        // Help finish off any jobs
+        while (jobsRunning())
+            work();
         
+        // If we're running parent jobs, wait for them to finish
+        while (parentJobs)
+            work();
+
+        // Remove any worker tasks
         for (auto & w: workers)
             w.join();
     }
@@ -265,6 +261,12 @@ struct ThreadPool::Itl {
         return *threadEntry;
     }
 
+    void runParentWorker()
+    {
+        while (!shutdown && (this->work() || jobsRunning())) ;
+        --this->parentJobs;
+    }
+
     /** Add a new job to be run.  This is lock-free except for the very
         first call from a given thread to a given thread pool, in which
         case there are locks taken for some of the bookkeeping.
@@ -275,7 +277,7 @@ struct ThreadPool::Itl {
     */
     void add(ThreadJob job)
     {
-        jobs.submitted += 1;
+        submitted += 1;
 
         std::unique_ptr<ThreadJob> overflow
             (getEntry().queue->push(new ThreadJob(std::move(job))));
@@ -291,11 +293,7 @@ struct ThreadPool::Itl {
                 else {
                     auto parentJob = [this] ()
                         {
-                            while (this->work() || jobsRunning()) ;
-                            --this->parentJobs;
-                            // If there is a race, make sure work
-                            // gets done
-                            while (this->work());
+                            this->runParentWorker();
                         };
                     parent->add(parentJob);
                 }
@@ -332,6 +330,7 @@ struct ThreadPool::Itl {
             result = true;
             ++jobsRunLocally;
             runJob(*job);
+            delete job;
         }
         
         return result;
@@ -389,8 +388,12 @@ struct ThreadPool::Itl {
     /** Run a job we successfully dequeued from a queue somewhere. */
     void runJob(const ThreadJob & job)
     {
-        job();
-        jobs.finished += 1;
+        try {
+            job();
+        } JML_CATCH_ALL {
+            finished += 1;
+            throw;
+        }
     }
 
     /** Wait for all work in all threads to be done, and return when it
@@ -480,7 +483,7 @@ struct ThreadPool::Itl {
         } while (newQueues->epoch == 0);
 
         newQueues->emplace_back(thread->queue);
-        queues = newQueues;
+        queues = std::move(newQueues);
     }
 
     /** A thread has exited and so its queue is no longer available for
@@ -515,7 +518,7 @@ struct ThreadPool::Itl {
         }
         ExcAssert(foundThreadToUnpublish);
         
-        queues = newQueues;
+        queues = std::move(newQueues);
     }
 };
 

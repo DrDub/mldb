@@ -38,6 +38,19 @@ void parallelReduce(It first, It2 last, Fn doWork)
 template<typename It, typename It2, typename Fn>
 void parallelReduceChunked(It first, It2 last, size_t chunkSize, Fn doWork)
 {
+    std::atomic<uint64_t> jobsRunning(0);
+
+    ThreadPool & tp = ThreadPool::instance();
+
+    // TODO: really chunked...
+    for (auto it = first;  it < last;  it += chunkSize) {
+        ++jobsRunning;
+        auto end = std::min<It>(it + chunkSize, last);
+        tp.add([&,it,end] () { doWork(it, end); --jobsRunning; });
+    }
+
+    while (jobsRunning > 0)
+        tp.work();
 }
 
 } // namespace Datacratic

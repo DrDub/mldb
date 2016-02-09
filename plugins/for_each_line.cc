@@ -255,7 +255,7 @@ void forEachLineBlock(std::istream & stream,
     std::atomic<int64_t> byteOffset(0);
     std::atomic<int> chunkNumber(0);
 
-    ThreadPool tp(ThreadPool::instance());
+    ThreadPool tp(8);
 
     // Memory map if possible
     const char * mapped = nullptr;

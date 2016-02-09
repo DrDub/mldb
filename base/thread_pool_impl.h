@@ -72,6 +72,7 @@ struct ThreadQueue {
             return nullptr;
         }
         
+        ExcAssert(item);
         --num_queued;
 
         return item;
