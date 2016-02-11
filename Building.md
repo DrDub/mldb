@@ -29,6 +29,8 @@ make compile
 make test
 ```
 
+*N.B.* If the `git submodule update --init` fails, edit the .git/config and change url for the submodule to its https:// form (get it from github).
+
 To speed things up, consider using the `-j` option in `make` to leverage multiple cores.
 
 Build output lands in the `build` directory and there is no `make clean` target: you can just `rm -rf build`. You can speed up recompilation after deleting your `build` directory by using `ccache`, which can be installed with `apt-get install ccache`. You can then create a file at the top of the repo directory called `local.mk` with the following contents:
