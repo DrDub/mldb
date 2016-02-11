@@ -7,7 +7,7 @@ These instructions are designed for a clean installation of **Ubuntu 14.04** and
 For C++ code to compile, the following system packages need to be installed:
 
 ```bash
-apt-get install -y git valgrind build-essential libboost-all-dev libgoogle-perftools-dev liblzma-dev libcrypto++-dev libblas-dev liblapack-dev python-virtualenv libcurl4-openssl-dev libssh2-1-dev libpython-dev libgit2-dev libv8-dev libarchive-dev
+apt-get install -y git valgrind build-essential libboost-all-dev libgoogle-perftools-dev liblzma-dev libcrypto++-dev libblas-dev liblapack-dev python-virtualenv libcurl4-openssl-dev libssh2-1-dev libpython-dev libgit2-dev libv8-dev libarchive-dev gfortran time
 ```
 
 For Python modules to install correctly:
