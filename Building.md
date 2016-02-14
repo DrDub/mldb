@@ -56,6 +56,8 @@ To *run* a development Docker image you just built, follow the Docker instructio
 
 Docker images built this way will have the internal/experimental entities shown in the documentation.  For external releases, the flags `RUN_STRIP=-s` is passed which, as a side effect, will hide the internal entities in the documentation.
 
+*N.B.* if you get errors regarding "not being a to connect to a port" run the make command as root, that is `sudo bash` then run it as root (`sudo make` doesn't seem to work).
+
 ## Basic Build System Commands
 
 These all work from the top-level of this repo:
